@@ -1,0 +1,9 @@
+node_modules/
+.env
+mcp-calls.json
+demo/http/dist/
+demo/http/node_modules/
+demo/mcp/dist/
+demo/mcp/node_modules/
+demo/mcp/mcp-calls.json
+.DS_Store
