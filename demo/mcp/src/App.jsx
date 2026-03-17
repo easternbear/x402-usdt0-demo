@@ -18,7 +18,7 @@ function BalanceCard({ balance, address, onRefresh }) {
         <div className="wallet-addr">{address || 'loading...'}</div>
       </div>
       <div className="balance-right">
-        <span className="chain-badge">Plasma &middot; 9745</span>
+        <span className="chain-badge">Stable Testnet &middot; 2201</span>
         <button className="refresh-btn" onClick={onRefresh}>Refresh</button>
       </div>
     </div>
@@ -134,7 +134,7 @@ function App() {
     <div className="shell">
       <header>
         <h1><span className="logo">x402</span> MCP Dashboard</h1>
-        <p className="subtitle">USDT0 on Plasma &middot; Tool call history</p>
+        <p className="subtitle">USDT0 on Stable Testnet &middot; Tool call history</p>
       </header>
 
       <BalanceCard balance={balance} address={address} onRefresh={load} />

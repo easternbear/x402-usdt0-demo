@@ -5,7 +5,7 @@ import { x402Facilitator } from "@x402/core/facilitator";
 import { registerExactEvmScheme } from "@x402/evm/exact/facilitator";
 import WalletAccountEvmX402Facilitator from "@semanticpay/wdk-wallet-evm-x402-facilitator";
 import WalletManagerEvm from "@tetherto/wdk-wallet-evm";
-import { USDT0_ADDRESS, PLASMA_RPC, PLASMA_NETWORK } from "./config.js";
+import { USDT0_ADDRESS, CHAIN_RPC, CHAIN_NETWORK, CHAIN_EXPLORER } from "./config.js";
 
 config();
 
@@ -18,7 +18,7 @@ if (!MNEMONIC) {
 }
 
 const walletAccount = await new WalletManagerEvm(MNEMONIC, {
-  provider: PLASMA_RPC,
+  provider: CHAIN_RPC,
 }).getAccount();
 
 const evmSigner = new WalletAccountEvmX402Facilitator(walletAccount);
@@ -88,11 +88,11 @@ const facilitator = new x402Facilitator()
       type: "settle_started",
       step: 9,
       title: "On-Chain Settlement Started",
-      description: "Broadcasting receiveWithAuthorization transaction to Plasma blockchain",
+      description: "Broadcasting receiveWithAuthorization transaction to Stable Testnet",
       details: {
         contract: `USDT0 (${USDT0_ADDRESS.slice(0, 6)}...${USDT0_ADDRESS.slice(-4)})`,
         method: "receiveWithAuthorization",
-        chain: "Plasma (chainId: 9745)",
+        chain: "Stable Testnet (chainId: 2201)",
         network: context.requirements?.network,
       },
       actor: "facilitator",
@@ -109,11 +109,11 @@ const facilitator = new x402Facilitator()
       type: "settle_completed",
       step: 10,
       title: "Settlement Confirmed",
-      description: "Payment transaction confirmed on Plasma blockchain",
+      description: "Payment transaction confirmed on Stable Testnet",
       details: {
         success: context.result?.success,
         transactionHash: txHash,
-        explorerUrl: txHash ? `https://explorer.plasma.to/tx/${txHash}` : null,
+        explorerUrl: txHash ? `${CHAIN_EXPLORER}/tx/${txHash}` : null,
         network: context.requirements?.network,
       },
       actor: "blockchain",
@@ -135,7 +135,7 @@ const facilitator = new x402Facilitator()
 
 registerExactEvmScheme(facilitator, {
   signer: evmSigner,
-  networks: PLASMA_NETWORK,
+  networks: CHAIN_NETWORK,
 });
 
 const app = express();
@@ -195,15 +195,15 @@ app.get("/supported", async (req, res) => {
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    chain: "plasma",
-    chainId: 9745,
+    chain: "stable-testnet",
+    chainId: 2201,
     facilitator: walletAccount.address,
   });
 });
 
 app.listen(parseInt(PORT), () => {
   console.log(`x402 facilitator running on http://localhost:${PORT}`);
-  console.log(`Network: ${PLASMA_NETWORK}`);
+  console.log(`Network: ${CHAIN_NETWORK}`);
   console.log(`USDT0: ${USDT0_ADDRESS}`);
   console.log(`Account: ${walletAccount.address}`);
 });

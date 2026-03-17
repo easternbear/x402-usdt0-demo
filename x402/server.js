@@ -7,7 +7,7 @@ import { HTTPFacilitatorClient } from "@x402/core/server";
 import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
 import { registerExactEvmScheme as registerClientScheme } from "@x402/evm/exact/client";
 import WalletManagerEvm from "@tetherto/wdk-wallet-evm";
-import { USDT0_ADDRESS, PLASMA_RPC, PLASMA_NETWORK, PRICE_UNITS } from "./config.js";
+import { USDT0_ADDRESS, CHAIN_RPC, CHAIN_NETWORK, PRICE_UNITS } from "./config.js";
 import { verifyFirstMiddleware } from "./middleware.js";
 
 config();
@@ -45,7 +45,7 @@ function broadcastEvent(type, data = {}) {
 // --- Wallet (for the demo client that initiates paid requests) ---
 
 const walletAccount = await new WalletManagerEvm(MNEMONIC, {
-  provider: PLASMA_RPC,
+  provider: CHAIN_RPC,
 }).getAccount();
 
 // --- External facilitator client ---
@@ -53,7 +53,7 @@ const walletAccount = await new WalletManagerEvm(MNEMONIC, {
 const facilitatorClient = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
 
 const resourceServer = new x402ResourceServer(facilitatorClient).register(
-  PLASMA_NETWORK,
+  CHAIN_NETWORK,
   new ExactEvmScheme()
 );
 
@@ -62,11 +62,11 @@ const routes = {
     accepts: [
       {
         scheme: "exact",
-        network: PLASMA_NETWORK,
+        network: CHAIN_NETWORK,
         price: {
           amount: PRICE_UNITS,
           asset: USDT0_ADDRESS,
-          extra: { name: "USDT0", version: "1", decimals: 6 },
+          extra: { name: "USD₮0", version: "1", decimals: 6 },
         },
         payTo: PAY_TO_ADDRESS,
       },
@@ -147,7 +147,7 @@ app.post("/demo/start-flow", async (req, res) => {
           status: 402,
           price: "0.0001 USDT0 (100 units)",
           payTo: PAY_TO_ADDRESS,
-          network: "Plasma (eip155:9745)",
+          network: "Stable Testnet (eip155:2201)",
           scheme: "exact",
         },
         actor: "server",
@@ -268,8 +268,8 @@ app.post("/demo/reset", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    chain: "plasma",
-    chainId: 9745,
+    chain: "stable-testnet",
+    chainId: 2201,
     facilitator: FACILITATOR_URL,
     payTo: PAY_TO_ADDRESS,
   });
@@ -277,7 +277,7 @@ app.get("/health", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`x402 server running on http://localhost:${PORT}`);
-  console.log(`Network: ${PLASMA_NETWORK}`);
+  console.log(`Network: ${CHAIN_NETWORK}`);
   console.log(`USDT0: ${USDT0_ADDRESS}`);
   console.log(`Facilitator: ${FACILITATOR_URL}`);
   console.log(`Pay to: ${PAY_TO_ADDRESS}`);

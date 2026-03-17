@@ -14,7 +14,7 @@ const actorLabels = {
   client: 'Client',
   server: 'Weather Server',
   facilitator: 'Facilitator',
-  blockchain: 'Plasma Blockchain'
+  blockchain: 'Stable Testnet'
 }
 
 function StatusPanel({ title, status, details, icon }) {
@@ -128,7 +128,7 @@ function ArchitectureDiagram({ activeActor }) {
 
       <div className={`arch-node blockchain ${activeActor === 'blockchain' ? 'active' : ''}`}>
         <div className="node-icon">⛓️</div>
-        <div className="node-label">Plasma</div>
+        <div className="node-label">Stable</div>
         <div className="node-sublabel">USDT0</div>
       </div>
     </div>
@@ -294,7 +294,7 @@ function App() {
                 'Port': serverStatus?.server?.port || '4021',
                 'Endpoint': 'GET /weather',
                 'Price': '0.0001 USDT0',
-                'Chain': 'Plasma (9745)',
+                'Chain': 'Stable Testnet (2201)',
                 'Address': formatAddress(serverStatus?.server?.address),
                 'Pay To': formatAddress(serverStatus?.server?.payTo)
               }}
@@ -353,7 +353,7 @@ function App() {
               <div className="timeline-empty">
                 <p>Click "Access Weather App" to start a <strong>real</strong> payment flow</p>
                 <p className="timeline-hint">
-                  This will execute an actual USDT0 transfer on Plasma blockchain
+                  This will execute an actual USDT0 transfer on Stable Testnet
                 </p>
               </div>
             ) : (
@@ -372,14 +372,14 @@ function App() {
 
       <footer className="footer">
         <p>
-          x402 Protocol Demo — Real payments with USDT0 on Plasma
+          x402 Protocol Demo — Real payments with USDT0 on Stable Testnet
         </p>
         <p className="footer-links">
           <a href="https://x402.org" target="_blank" rel="noopener">x402.org</a>
           <span className="separator">•</span>
-          <a href="https://plasma.to" target="_blank" rel="noopener">plasma.to</a>
+          <a href="https://stable.xyz" target="_blank" rel="noopener">stable.xyz</a>
           <span className="separator">•</span>
-          <a href="https://explorer.plasma.to" target="_blank" rel="noopener">Explorer</a>
+          <a href="https://testnet.stablescan.xyz" target="_blank" rel="noopener">Explorer</a>
         </p>
       </footer>
     </div>

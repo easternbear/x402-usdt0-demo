@@ -7,3 +7,4 @@ demo/mcp/dist/
 demo/mcp/node_modules/
 demo/mcp/mcp-calls.json
 .DS_Store
+.idea
