@@ -97,18 +97,7 @@ When Claude calls the `get-weather` tool:
 
 ### Wallet Index
 
-This project uses WDK to derive wallets from BIP-44 path `m/44'/60'/0'/0/{index}`. Testnet defaults to index 0, mainnet to index 2. Adjust `WALLET_INDEX` in `x402/config.js` to match the index that holds your USDT0 balance.
-
-```bash
-# Check wallet address
-NETWORK_MODE=testnet node -e "
-import WalletManagerEvm from '@tetherto/wdk-wallet-evm';
-import { CHAIN_RPC, WALLET_INDEX } from './x402/config.js';
-import { config } from 'dotenv'; config();
-const a = await new WalletManagerEvm(process.env.MNEMONIC, { provider: CHAIN_RPC }).getAccount(WALLET_INDEX);
-console.log('Address:', a.address);
-"
-```
+This project derives wallets from BIP-44 path `m/44'/60'/0'/0/{index}`. Testnet defaults to index 0, mainnet to index 2. Adjust `WALLET_INDEX` in `x402/config.js` to match the index that holds your USDT0 balance.
 
 ## Quick Start
 
