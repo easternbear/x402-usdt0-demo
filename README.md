@@ -88,19 +88,19 @@ When Claude calls the `get-weather` tool:
 
 ## Prerequisites
 
-- **Node.js** v20 이상
-- **BIP-39 Mnemonic**: HD 지갑 시드 구문. MetaMask 등에서 확인하거나 새로 생성
-- **USDT0 잔액**: 결제에 사용할 지갑에 USDT0가 있어야 합니다
-  - 테스트넷: [faucet.stable.xyz](https://faucet.stable.xyz)에서 무료 수령
-  - 메인넷: [usdt0.to/transfer](https://usdt0.to/transfer) 브릿지로 USDT0 전환
-- **수신 주소**: 결제를 받을 Ethereum 주소 (PAY_TO_ADDRESS)
+- **Node.js** v20+
+- **BIP-39 Mnemonic**: HD wallet seed phrase. Generate a new one or export from MetaMask.
+- **USDT0 balance**: The derived wallet must hold USDT0.
+  - Testnet: Get free tokens from [faucet.stable.xyz](https://faucet.stable.xyz)
+  - Mainnet: Bridge USDT via [usdt0.to/transfer](https://usdt0.to/transfer)
+- **Pay-to address**: An Ethereum address (0x...) to receive payments (PAY_TO_ADDRESS).
 
 ### Wallet Index
 
-이 프로젝트는 WDK를 사용하여 BIP-44 경로(`m/44'/60'/0'/0/{index}`)로 지갑을 파생합니다. 테스트넷은 index 0, 메인넷은 index 2를 기본으로 사용합니다. 잔액이 있는 index에 맞춰 `x402/config.js`의 `WALLET_INDEX`를 조정하세요.
+This project uses WDK to derive wallets from BIP-44 path `m/44'/60'/0'/0/{index}`. Testnet defaults to index 0, mainnet to index 2. Adjust `WALLET_INDEX` in `x402/config.js` to match the index that holds your USDT0 balance.
 
 ```bash
-# 지갑 주소 확인
+# Check wallet address
 NETWORK_MODE=testnet node -e "
 import WalletManagerEvm from '@tetherto/wdk-wallet-evm';
 import { CHAIN_RPC, WALLET_INDEX } from './x402/config.js';
