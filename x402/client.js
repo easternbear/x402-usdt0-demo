@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import { x402Client, wrapFetchWithPayment, x402HTTPClient } from "@x402/fetch";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import WalletManagerEvm from "@tetherto/wdk-wallet-evm";
-import { CHAIN_RPC } from "./config.js";
+import { CHAIN_RPC, WALLET_INDEX } from "./config.js";
 
 config();
 
@@ -19,7 +19,7 @@ if (!mnemonic) {
 async function main() {
   const evmSigner = await new WalletManagerEvm(mnemonic, {
     provider: CHAIN_RPC,
-  }).getAccount();
+  }).getAccount(WALLET_INDEX);
 
   console.log(`Signer address: ${evmSigner.address}`);
 

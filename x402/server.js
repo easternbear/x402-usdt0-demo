@@ -7,7 +7,7 @@ import { HTTPFacilitatorClient } from "@x402/core/server";
 import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
 import { registerExactEvmScheme as registerClientScheme } from "@x402/evm/exact/client";
 import WalletManagerEvm from "@tetherto/wdk-wallet-evm";
-import { USDT0_ADDRESS, CHAIN_RPC, CHAIN_NETWORK, PRICE_UNITS } from "./config.js";
+import { USDT0_ADDRESS, CHAIN_RPC, CHAIN_NETWORK, CHAIN_EXPLORER, CHAIN_LABEL, CHAIN_ID, USDT0_DOMAIN_NAME, WALLET_INDEX, PRICE_UNITS, NETWORK_MODE } from "./config.js";
 import { verifyFirstMiddleware } from "./middleware.js";
 
 config();
@@ -46,9 +46,12 @@ function broadcastEvent(type, data = {}) {
 
 const walletAccount = await new WalletManagerEvm(MNEMONIC, {
   provider: CHAIN_RPC,
-}).getAccount();
+}).getAccount(WALLET_INDEX);
 
 // --- External facilitator client ---
+
+// --- Logging helper ---
+const log = (tag, ...args) => console.log(`[${new Date().toISOString()}] [${tag}]`, ...args);
 
 const facilitatorClient = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
 
@@ -66,7 +69,7 @@ const routes = {
         price: {
           amount: PRICE_UNITS,
           asset: USDT0_ADDRESS,
-          extra: { name: "USD₮0", version: "1", decimals: 6 },
+          extra: { name: USDT0_DOMAIN_NAME, version: "1", decimals: 6 },
         },
         payTo: PAY_TO_ADDRESS,
       },
@@ -120,6 +123,7 @@ app.post("/demo/start-flow", async (req, res) => {
   broadcastEvent("flow_reset");
 
   try {
+    log("CLIENT", `Step 1: GET /weather (signer: ${walletAccount.address})  [server.js:126]`);
     broadcastEvent("request_initiated", {
       step: 1,
       title: "Request Initiated",
@@ -136,9 +140,12 @@ app.post("/demo/start-flow", async (req, res) => {
     await sleep(300);
 
     const weatherUrl = `http://localhost:${PORT}/weather`;
+    log("CLIENT", "Sending bare GET /weather (no payment)...  [server.js:141]");
     const initial402 = await fetch(weatherUrl);
+    log("CLIENT", `Response: ${initial402.status}  [server.js:143]`);
 
     if (initial402.status === 402) {
+      log("CLIENT", "Step 2: Received 402 Payment Required  [server.js:146]");
       broadcastEvent("payment_required", {
         step: 2,
         title: "402 Payment Required",
@@ -147,7 +154,7 @@ app.post("/demo/start-flow", async (req, res) => {
           status: 402,
           price: "0.0001 USDT0 (100 units)",
           payTo: PAY_TO_ADDRESS,
-          network: "Stable Testnet (eip155:2201)",
+          network: `${CHAIN_LABEL} (${CHAIN_NETWORK})`,
           scheme: "exact",
         },
         actor: "server",
@@ -156,6 +163,7 @@ app.post("/demo/start-flow", async (req, res) => {
 
       await sleep(300);
 
+      log("CLIENT", "Step 3: Signing EIP-3009 TransferWithAuthorization...");
       broadcastEvent("payment_signing", {
         step: 3,
         title: "Signing Payment Authorization",
@@ -171,6 +179,7 @@ app.post("/demo/start-flow", async (req, res) => {
 
       await sleep(400);
 
+      log("CLIENT", "Step 4: Signature created");
       broadcastEvent("payment_signed", {
         step: 4,
         title: "Payment Signed",
@@ -184,6 +193,7 @@ app.post("/demo/start-flow", async (req, res) => {
 
       await sleep(200);
 
+      log("CLIENT", "Step 5: Retrying GET /weather with payment signature...");
       broadcastEvent("request_with_payment", {
         step: 5,
         title: "Request with Payment Payload",
@@ -204,8 +214,10 @@ app.post("/demo/start-flow", async (req, res) => {
     registerClientScheme(client, { signer: walletAccount });
     const wrappedFetch = wrapFetchWithPayment(fetch, client);
 
+    log("CLIENT", "Sending paid GET /weather via wrapFetchWithPayment...");
     const response = await wrappedFetch(weatherUrl, { method: "GET" });
     const body = await response.json();
+    log("CLIENT", `Step 8: Response ${response.status}`, response.ok ? "OK" : "FAILED");
 
     if (response.ok) {
       broadcastEvent("response_received", {
@@ -255,6 +267,10 @@ app.get("/demo/status", (req, res) => {
       facilitator: `external (${FACILITATOR_URL})`,
       address: walletAccount.address,
       payTo: PAY_TO_ADDRESS,
+      chainLabel: CHAIN_LABEL,
+      chainId: CHAIN_ID,
+      network: CHAIN_NETWORK,
+      explorer: CHAIN_EXPLORER,
     },
     connectedClients: sseClients.size,
   });
@@ -268,8 +284,8 @@ app.post("/demo/reset", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    chain: "stable-testnet",
-    chainId: 2201,
+    chain: CHAIN_LABEL,
+    chainId: CHAIN_ID,
     facilitator: FACILITATOR_URL,
     payTo: PAY_TO_ADDRESS,
   });

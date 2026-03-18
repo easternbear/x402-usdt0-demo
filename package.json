@@ -3,10 +3,10 @@
   "type": "module",
   "scripts": {
     "setup": "node bin/setup.js",
-    "demo:http": "concurrently \"node x402/facilitator.js\" \"node x402/server.js\" \"npm run dev --prefix demo/http\"",
-    "demo:http-inprocess": "concurrently \"node x402/server-inprocess.js\" \"npm run dev --prefix demo/http\"",
-    "demo:mcp": "npm run build --prefix demo/mcp && concurrently \"node x402/facilitator.js\" \"node x402/server.js\" \"node demo/mcp/dashboard.js\"",
-    "demo:mcp-inprocess": "npm run build --prefix demo/mcp && concurrently \"node x402/server-inprocess.js\" \"node demo/mcp/dashboard.js\""
+    "demo:http:testnet": "NETWORK_MODE=testnet concurrently \"node x402/server-inprocess.js\" \"npm run dev --prefix demo/http\"",
+    "demo:http:mainnet": "NETWORK_MODE=mainnet concurrently \"node x402/server.js\" \"npm run dev --prefix demo/http\"",
+    "demo:mcp:testnet": "NETWORK_MODE=testnet npm run build --prefix demo/mcp && NETWORK_MODE=testnet concurrently \"node x402/server-inprocess.js\" \"node demo/mcp/dashboard.js\"",
+    "demo:mcp:mainnet": "NETWORK_MODE=mainnet npm run build --prefix demo/mcp && NETWORK_MODE=mainnet concurrently \"node x402/server.js\" \"node demo/mcp/dashboard.js\""
   },
   "dependencies": {
     "@x402/core": "^2.2.0",

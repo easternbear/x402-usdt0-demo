@@ -10,13 +10,6 @@ const actorColors = {
   blockchain: '#f59e0b'
 }
 
-const actorLabels = {
-  client: 'Client',
-  server: 'Weather Server',
-  facilitator: 'Facilitator',
-  blockchain: 'Stable Testnet'
-}
-
 function StatusPanel({ title, status, details, icon }) {
   return (
     <div className={`status-panel ${status}`}>
@@ -41,7 +34,7 @@ function StatusPanel({ title, status, details, icon }) {
   )
 }
 
-function TimelineStep({ step, isActive, isCompleted }) {
+function TimelineStep({ step, isActive, isCompleted, actorLabels }) {
   const { title, description, details, actor, target, timestamp, isError } = step
 
   return (
@@ -102,7 +95,51 @@ function TimelineStep({ step, isActive, isCompleted }) {
   )
 }
 
-function ArchitectureDiagram({ activeActor }) {
+function ArchitectureDiagram({ activeActor, chainLabel, isExternal }) {
+  if (isExternal) {
+    return (
+      <div className="architecture-diagram">
+        <div className={`arch-node client ${activeActor === 'client' ? 'active' : ''}`}>
+          <div className="node-icon">👤</div>
+          <div className="node-label">Client</div>
+        </div>
+
+        <div className="arch-connection horizontal">
+          <div className="connection-line" />
+          <div className="connection-arrow">→</div>
+        </div>
+
+        <div className={`arch-node server ${activeActor === 'server' ? 'active' : ''}`}>
+          <div className="node-icon">🌤️</div>
+          <div className="node-label">Server</div>
+          <div className="node-sublabel">Resource Server</div>
+        </div>
+
+        <div className="arch-connection horizontal">
+          <div className="connection-line" />
+          <div className="connection-arrow">→</div>
+        </div>
+
+        <div className={`arch-node facilitator ${activeActor === 'facilitator' ? 'active' : ''}`}>
+          <div className="node-icon">🔐</div>
+          <div className="node-label">Facilitator</div>
+          <div className="node-sublabel">SemanticPay</div>
+        </div>
+
+        <div className="arch-connection horizontal">
+          <div className="connection-line" />
+          <div className="connection-arrow">→</div>
+        </div>
+
+        <div className={`arch-node blockchain ${activeActor === 'blockchain' ? 'active' : ''}`}>
+          <div className="node-icon">⛓️</div>
+          <div className="node-label">{chainLabel}</div>
+          <div className="node-sublabel">USDT0</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="architecture-diagram">
       <div className={`arch-node client ${activeActor === 'client' ? 'active' : ''}`}>
@@ -128,7 +165,7 @@ function ArchitectureDiagram({ activeActor }) {
 
       <div className={`arch-node blockchain ${activeActor === 'blockchain' ? 'active' : ''}`}>
         <div className="node-icon">⛓️</div>
-        <div className="node-label">Stable</div>
+        <div className="node-label">{chainLabel}</div>
         <div className="node-sublabel">USDT0</div>
       </div>
     </div>
@@ -145,6 +182,18 @@ function App() {
   const [error, setError] = useState(null)
   const eventSourceRef = useRef(null)
   const timelineRef = useRef(null)
+
+  const chainLabel = serverStatus?.server?.chainLabel || 'Blockchain'
+  const chainId = serverStatus?.server?.chainId || ''
+  const explorer = serverStatus?.server?.explorer || 'https://stablescan.xyz'
+  const isExternal = serverStatus?.server?.facilitator ? !serverStatus.server.facilitator.includes('in-process') : false
+
+  const actorLabels = {
+    client: 'Client',
+    server: 'Weather Server',
+    facilitator: 'Facilitator',
+    blockchain: chainLabel
+  }
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -280,21 +329,21 @@ function App() {
       <main className="main">
         <section className="architecture-section">
           <h2>System Architecture</h2>
-          <ArchitectureDiagram activeActor={activeActor} />
+          <ArchitectureDiagram activeActor={activeActor} chainLabel={chainLabel} isExternal={isExternal} />
         </section>
 
         <section className="status-section">
           <h2>Service Status</h2>
           <div className="status-grid">
             <StatusPanel
-              title="Server (facilitator in-process)"
+              title={`Server (${serverStatus?.server?.facilitator || 'loading...'})`}
               status={serverStatus ? 'running' : 'idle'}
               icon="🌤️"
               details={{
                 'Port': serverStatus?.server?.port || '4021',
                 'Endpoint': 'GET /weather',
                 'Price': '0.0001 USDT0',
-                'Chain': 'Stable Testnet (2201)',
+                'Chain': chainId ? `${chainLabel} (${chainId})` : 'loading...',
                 'Address': formatAddress(serverStatus?.server?.address),
                 'Pay To': formatAddress(serverStatus?.server?.payTo)
               }}
@@ -353,7 +402,7 @@ function App() {
               <div className="timeline-empty">
                 <p>Click "Access Weather App" to start a <strong>real</strong> payment flow</p>
                 <p className="timeline-hint">
-                  This will execute an actual USDT0 transfer on Stable Testnet
+                  This will execute an actual USDT0 transfer on {chainLabel}
                 </p>
               </div>
             ) : (
@@ -363,6 +412,7 @@ function App() {
                   step={step}
                   isActive={index === steps.length - 1 && flowActive}
                   isCompleted={index < steps.length - 1 || !flowActive}
+                  actorLabels={actorLabels}
                 />
               ))
             )}
@@ -372,14 +422,14 @@ function App() {
 
       <footer className="footer">
         <p>
-          x402 Protocol Demo — Real payments with USDT0 on Stable Testnet
+          x402 Protocol Demo — Real payments with USDT0 on {chainLabel}
         </p>
         <p className="footer-links">
           <a href="https://x402.org" target="_blank" rel="noopener">x402.org</a>
           <span className="separator">•</span>
           <a href="https://stable.xyz" target="_blank" rel="noopener">stable.xyz</a>
           <span className="separator">•</span>
-          <a href="https://testnet.stablescan.xyz" target="_blank" rel="noopener">Explorer</a>
+          <a href={explorer} target="_blank" rel="noopener">Explorer</a>
         </p>
       </footer>
     </div>

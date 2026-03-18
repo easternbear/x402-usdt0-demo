@@ -9,7 +9,7 @@ import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
 import { registerExactEvmScheme as registerClientScheme } from "@x402/evm/exact/client";
 import WalletAccountEvmX402Facilitator from "@semanticpay/wdk-wallet-evm-x402-facilitator";
 import WalletManagerEvm from "@tetherto/wdk-wallet-evm";
-import { USDT0_ADDRESS, CHAIN_RPC, CHAIN_NETWORK, CHAIN_EXPLORER, PRICE_UNITS } from "./config.js";
+import { USDT0_ADDRESS, CHAIN_RPC, CHAIN_NETWORK, CHAIN_EXPLORER, CHAIN_LABEL, CHAIN_ID, USDT0_DOMAIN_NAME, WALLET_INDEX, PRICE_UNITS, NETWORK_MODE } from "./config.js";
 import { verifyFirstMiddleware } from "./middleware.js";
 
 config();
@@ -38,7 +38,7 @@ function broadcastEvent(type, data = {}) {
 
 const walletAccount = await new WalletManagerEvm(MNEMONIC, {
   provider: CHAIN_RPC,
-}).getAccount();
+}).getAccount(WALLET_INDEX);
 
 const evmSigner = new WalletAccountEvmX402Facilitator(walletAccount);
 
@@ -83,11 +83,11 @@ const facilitator = new x402Facilitator()
     broadcastEvent("settle_started", {
       step: 9,
       title: "On-Chain Settlement Started",
-      description: "Broadcasting receiveWithAuthorization transaction to Stable Testnet",
+      description: `Broadcasting receiveWithAuthorization transaction to ${CHAIN_LABEL}`,
       details: {
         contract: `USDT0 (${USDT0_ADDRESS.slice(0, 6)}...${USDT0_ADDRESS.slice(-4)})`,
         method: "receiveWithAuthorization",
-        chain: "Stable Testnet (chainId: 2201)",
+        chain: `${CHAIN_LABEL} (chainId: ${CHAIN_ID})`,
         network: context.requirements?.network,
       },
       actor: "facilitator",
@@ -99,7 +99,7 @@ const facilitator = new x402Facilitator()
     broadcastEvent("settle_completed", {
       step: 10,
       title: "Settlement Confirmed",
-      description: "Payment transaction confirmed on Stable Testnet",
+      description: `Payment transaction confirmed on ${CHAIN_LABEL}`,
       details: {
         success: context.result?.success,
         transactionHash: txHash,
@@ -140,7 +140,7 @@ const routes = {
         price: {
           amount: PRICE_UNITS,
           asset: USDT0_ADDRESS,
-          extra: { name: "USD₮0", version: "1", decimals: 6 },
+          extra: { name: USDT0_DOMAIN_NAME, version: "1", decimals: 6 },
         },
         payTo: PAY_TO_ADDRESS,
       },
@@ -218,7 +218,7 @@ app.post("/demo/start-flow", async (req, res) => {
           status: 402,
           price: "0.0001 USDT0 (100 units)",
           payTo: PAY_TO_ADDRESS,
-          network: "Stable Testnet (eip155:2201)",
+          network: `${CHAIN_LABEL} (${CHAIN_NETWORK})`,
           scheme: "exact",
         },
         actor: "server",
@@ -326,6 +326,10 @@ app.get("/demo/status", (req, res) => {
       facilitator: "in-process",
       address: walletAccount.address,
       payTo: PAY_TO_ADDRESS,
+      chainLabel: CHAIN_LABEL,
+      chainId: CHAIN_ID,
+      network: CHAIN_NETWORK,
+      explorer: CHAIN_EXPLORER,
     },
     connectedClients: sseClients.size,
   });
@@ -339,8 +343,8 @@ app.post("/demo/reset", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    chain: "stable-testnet",
-    chainId: 2201,
+    chain: CHAIN_LABEL,
+    chainId: CHAIN_ID,
     facilitator: walletAccount.address,
     payTo: PAY_TO_ADDRESS,
   });

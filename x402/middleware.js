@@ -1,5 +1,7 @@
 import { ExpressAdapter } from "@x402/express";
 
+const log = (tag, ...args) => console.log(`[${new Date().toISOString()}] [${tag}]`, ...args);
+
 export function verifyFirstMiddleware(httpServer, initPromiseHolder, { onEvent } = {}) {
   const emit = onEvent || (() => {});
 
@@ -15,8 +17,10 @@ export function verifyFirstMiddleware(httpServer, initPromiseHolder, { onEvent }
     };
 
     if (!httpServer.requiresPayment(context)) {
+      log("SERVER", `${req.method} ${req.path} — no payment required`);
       return next();
     }
+    log("SERVER", `${req.method} ${req.path} — payment required, hasPayment: ${!!context.paymentHeader}`);
 
     if (initPromiseHolder.promise) {
       await initPromiseHolder.promise;
@@ -28,6 +32,7 @@ export function verifyFirstMiddleware(httpServer, initPromiseHolder, { onEvent }
     const hasPayment = !!context.paymentHeader;
 
     if (hasPayment) {
+      log("FACILITATOR", "Step 6: → POST /verify to facilitator");
       emit("verify_started", {
         step: 6,
         title: "Payment Verification Started",
@@ -40,12 +45,14 @@ export function verifyFirstMiddleware(httpServer, initPromiseHolder, { onEvent }
     }
 
     const result = await httpServer.processHTTPRequest(context);
+    log("SERVER", `processHTTPRequest result: ${result.type}`);
 
     switch (result.type) {
       case "no-payment-required":
         return next();
 
       case "payment-error": {
+        log("FACILITATOR", `Step 7: Verification FAILED (status: ${result.response.status})`);
         if (hasPayment) {
           emit("verify_failed", {
             step: 7,
@@ -72,6 +79,7 @@ export function verifyFirstMiddleware(httpServer, initPromiseHolder, { onEvent }
 
       case "payment-verified": {
         const { paymentPayload, paymentRequirements } = result;
+        log("FACILITATOR", "Step 7: Verification PASSED");
 
         emit("verify_completed", {
           step: 7,
@@ -83,6 +91,7 @@ export function verifyFirstMiddleware(httpServer, initPromiseHolder, { onEvent }
 
         res.on("finish", () => {
           // --- Settle phase ---
+          log("FACILITATOR", "Step 9: → POST /settle to facilitator (async, after response sent)");
           emit("settle_started", {
             step: 9,
             title: "On-Chain Settlement Started",
@@ -98,6 +107,7 @@ export function verifyFirstMiddleware(httpServer, initPromiseHolder, { onEvent }
           httpServer
             .processSettlement(paymentPayload, paymentRequirements)
             .then((settleResult) => {
+              log("FACILITATOR", `Step 10: Settlement result — success: ${settleResult.success}`, settleResult.transaction ? `tx: ${settleResult.transaction}` : settleResult.errorReason || "");
               if (settleResult.success) {
                 emit("settle_completed", {
                   step: 10,
@@ -124,6 +134,7 @@ export function verifyFirstMiddleware(httpServer, initPromiseHolder, { onEvent }
               }
             })
             .catch((err) => {
+              log("FACILITATOR", `Step 10: Settlement ERROR — ${err.message}`);
               emit("settle_failed", {
                 step: 10,
                 title: "Settlement Failed",

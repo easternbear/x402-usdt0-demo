@@ -10,7 +10,7 @@ config();
 
 const PORT = process.env.DASHBOARD_PORT || 4030;
 const MNEMONIC = process.env.MNEMONIC;
-const USDT0_ADDRESS = "0x78Cf24370174180738C5B8E352B6D14c83a6c9A9";
+const USDT0_ADDRESS = process.env.USDT0_ADDRESS || "0x78Cf24370174180738C5B8E352B6D14c83a6c9A9";
 const LOG_PATH = new URL("./mcp-calls.json", import.meta.url).pathname;
 
 if (!MNEMONIC) {
@@ -19,7 +19,7 @@ if (!MNEMONIC) {
 }
 
 const walletAccount = await new WalletManagerEvm(MNEMONIC, {
-  provider: "https://rpc.testnet.stable.xyz",
+  provider: process.env.CHAIN_RPC || "https://rpc.testnet.stable.xyz",
 }).getAccount();
 
 const app = express();

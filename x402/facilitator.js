@@ -5,7 +5,7 @@ import { x402Facilitator } from "@x402/core/facilitator";
 import { registerExactEvmScheme } from "@x402/evm/exact/facilitator";
 import WalletAccountEvmX402Facilitator from "@semanticpay/wdk-wallet-evm-x402-facilitator";
 import WalletManagerEvm from "@tetherto/wdk-wallet-evm";
-import { USDT0_ADDRESS, CHAIN_RPC, CHAIN_NETWORK, CHAIN_EXPLORER } from "./config.js";
+import { USDT0_ADDRESS, CHAIN_RPC, CHAIN_NETWORK, CHAIN_EXPLORER, CHAIN_LABEL, CHAIN_ID, WALLET_INDEX } from "./config.js";
 
 config();
 
@@ -19,7 +19,7 @@ if (!MNEMONIC) {
 
 const walletAccount = await new WalletManagerEvm(MNEMONIC, {
   provider: CHAIN_RPC,
-}).getAccount();
+}).getAccount(WALLET_INDEX);
 
 const evmSigner = new WalletAccountEvmX402Facilitator(walletAccount);
 
@@ -88,11 +88,11 @@ const facilitator = new x402Facilitator()
       type: "settle_started",
       step: 9,
       title: "On-Chain Settlement Started",
-      description: "Broadcasting receiveWithAuthorization transaction to Stable Testnet",
+      description: `Broadcasting receiveWithAuthorization transaction to ${CHAIN_LABEL}`,
       details: {
         contract: `USDT0 (${USDT0_ADDRESS.slice(0, 6)}...${USDT0_ADDRESS.slice(-4)})`,
         method: "receiveWithAuthorization",
-        chain: "Stable Testnet (chainId: 2201)",
+        chain: `${CHAIN_LABEL} (chainId: ${CHAIN_ID})`,
         network: context.requirements?.network,
       },
       actor: "facilitator",
@@ -109,7 +109,7 @@ const facilitator = new x402Facilitator()
       type: "settle_completed",
       step: 10,
       title: "Settlement Confirmed",
-      description: "Payment transaction confirmed on Stable Testnet",
+      description: `Payment transaction confirmed on ${CHAIN_LABEL}`,
       details: {
         success: context.result?.success,
         transactionHash: txHash,
@@ -195,8 +195,8 @@ app.get("/supported", async (req, res) => {
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    chain: "stable-testnet",
-    chainId: 2201,
+    chain: CHAIN_LABEL,
+    chainId: CHAIN_ID,
     facilitator: walletAccount.address,
   });
 });

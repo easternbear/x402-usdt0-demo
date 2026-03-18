@@ -28,7 +28,7 @@ function logCall(entry) {
 
 async function createClient() {
   const evmSigner = await new WalletManagerEvm(mnemonic, {
-    provider: "https://rpc.testnet.stable.xyz",
+    provider: process.env.CHAIN_RPC || "https://rpc.testnet.stable.xyz",
   }).getAccount();
 
   const client = new x402Client();
