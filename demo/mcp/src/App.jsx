@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import './App.css'
 
-function BalanceCard({ balance, address, onRefresh }) {
-  const formatAddress = (addr) => {
-    if (!addr) return '...'
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-  }
-
+function BalanceCard({ balance, address, chainLabel, chainId, onRefresh }) {
   return (
     <div className="balance-card">
       <div className="balance-left">
@@ -18,7 +13,7 @@ function BalanceCard({ balance, address, onRefresh }) {
         <div className="wallet-addr">{address || 'loading...'}</div>
       </div>
       <div className="balance-right">
-        <span className="chain-badge">Stable Testnet &middot; 2201</span>
+        <span className="chain-badge">{chainLabel} &middot; {chainId}</span>
         <button className="refresh-btn" onClick={onRefresh}>Refresh</button>
       </div>
     </div>
@@ -54,8 +49,13 @@ function SummaryRow({ calls }) {
   )
 }
 
-function CallHistory({ calls }) {
+function CallHistory({ calls, explorer }) {
   const reversed = [...calls].reverse()
+
+  const formatTx = (hash) => {
+    if (!hash) return null
+    return `${hash.slice(0, 6)}...${hash.slice(-4)}`
+  }
 
   return (
     <div className="table-section">
@@ -68,14 +68,15 @@ function CallHistory({ calls }) {
             <th>Tool</th>
             <th>Amount</th>
             <th>Status</th>
+            <th>Tx</th>
             <th>Time</th>
           </tr>
         </thead>
         <tbody>
           {reversed.length === 0 ? (
             <tr>
-              <td colSpan="4" className="empty-state">
-                No tool calls yet. Run the MCP server to see data here.
+              <td colSpan="5" className="empty-state">
+                No tool calls yet. Ask Claude Desktop to "get the weather" to trigger a paid request.
               </td>
             </tr>
           ) : (
@@ -89,6 +90,20 @@ function CallHistory({ calls }) {
                   <span className={`td-status ${call.status === 'success' ? 'success' : 'failed'}`}>
                     {call.status === 'success' ? '\u2713' : '\u2717'} {call.status}
                   </span>
+                </td>
+                <td className="td-tx">
+                  {call.txHash ? (
+                    <a
+                      href={`${explorer}/tx/${call.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tx-link"
+                    >
+                      {formatTx(call.txHash)}
+                    </a>
+                  ) : (
+                    <span className="td-no-tx">--</span>
+                  )}
                 </td>
                 <td className="td-time">
                   {new Date(call.timestamp).toLocaleString()}
@@ -106,6 +121,9 @@ function App() {
   const [balance, setBalance] = useState(null)
   const [address, setAddress] = useState(null)
   const [calls, setCalls] = useState([])
+  const [chainLabel, setChainLabel] = useState('Stable')
+  const [chainId, setChainId] = useState('')
+  const [explorer, setExplorer] = useState('https://stablescan.xyz')
 
   const load = useCallback(async () => {
     try {
@@ -125,6 +143,17 @@ function App() {
   }, [])
 
   useEffect(() => {
+    fetch('/api/config')
+      .then(r => r.json())
+      .then(cfg => {
+        setChainLabel(cfg.chainLabel || 'Stable')
+        setChainId(cfg.chainId || '')
+        setExplorer(cfg.explorer || 'https://stablescan.xyz')
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
     load()
     const interval = setInterval(load, 5000)
     return () => clearInterval(interval)
@@ -134,12 +163,12 @@ function App() {
     <div className="shell">
       <header>
         <h1><span className="logo">x402</span> MCP Dashboard</h1>
-        <p className="subtitle">USDT0 on Stable Testnet &middot; Tool call history</p>
+        <p className="subtitle">USDT0 on {chainLabel} &middot; Tool call history</p>
       </header>
 
-      <BalanceCard balance={balance} address={address} onRefresh={load} />
+      <BalanceCard balance={balance} address={address} chainLabel={chainLabel} chainId={chainId} onRefresh={load} />
       <SummaryRow calls={calls} />
-      <CallHistory calls={calls} />
+      <CallHistory calls={calls} explorer={explorer} />
     </div>
   )
 }

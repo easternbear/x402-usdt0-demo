@@ -1,13 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { readFileSync, writeFileSync } from "fs";
-import { x402Client, wrapFetchWithPayment } from "@x402/fetch";
+import { x402Client, wrapFetchWithPayment, x402HTTPClient } from "@x402/fetch";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import WalletManagerEvm from "@tetherto/wdk-wallet-evm";
 
 const mnemonic = process.env.MNEMONIC;
 const baseURL = process.env.RESOURCE_SERVER_URL || "http://localhost:4021";
 const endpointPath = process.env.ENDPOINT_PATH || "/weather";
+const walletIndex = parseInt(process.env.WALLET_INDEX || "0", 10);
 const PRICE_USDT0 = 0.0001;
 
 const LOG_PATH = new URL("./mcp-calls.json", import.meta.url).pathname;
@@ -29,16 +30,17 @@ function logCall(entry) {
 async function createClient() {
   const evmSigner = await new WalletManagerEvm(mnemonic, {
     provider: process.env.CHAIN_RPC || "https://rpc.testnet.stable.xyz",
-  }).getAccount();
+  }).getAccount(walletIndex);
 
   const client = new x402Client();
   registerExactEvmScheme(client, { signer: evmSigner });
 
-  return wrapFetchWithPayment(fetch, client);
+  return { fetchWithPayment: wrapFetchWithPayment(fetch, client), client };
 }
 
 async function main() {
-  const fetchWithPayment = await createClient();
+  const { fetchWithPayment, client: x402client } = await createClient();
+  const httpClient = new x402HTTPClient(x402client);
 
   const server = new McpServer({
     name: "x402 Weather Client",
@@ -66,6 +68,14 @@ async function main() {
 
         if (res.ok) {
           entry.status = "success";
+          try {
+            const paymentResponse = httpClient.getPaymentSettleResponse(
+              (name) => res.headers.get(name)
+            );
+            if (paymentResponse?.transaction) {
+              entry.txHash = paymentResponse.transaction;
+            }
+          } catch {}
         }
 
         logCall(entry);

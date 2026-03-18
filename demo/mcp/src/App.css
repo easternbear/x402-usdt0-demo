@@ -252,6 +252,26 @@ tbody tr:hover {
   color: var(--accent-red);
 }
 
+.td-tx {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+}
+
+.tx-link {
+  color: var(--accent-blue);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.tx-link:hover {
+  color: var(--accent-purple);
+  text-decoration: underline;
+}
+
+.td-no-tx {
+  color: var(--text-muted);
+}
+
 .td-time {
   font-size: 0.8rem;
   color: var(--text-muted);

@@ -1,152 +1,126 @@
 # x402-usdt0-demo
 
-A working demo of the [x402 payment protocol](https://x402.org) on [Plasma](https://plasma.to) blockchain using USDT0 and the [WDK (Wallet Development Kit)](https://docs.wallet.tether.io). Includes an HTTP payment flow visualization and an MCP integration for Claude Desktop.
+A working demo of the [x402 payment protocol](https://x402.org) on [Stable](https://stable.xyz) blockchain using USDT0 and the [WDK (Wallet Development Kit)](https://docs.wallet.tether.io). Includes an HTTP payment flow visualization and an MCP integration for Claude Desktop.
+
+Supports both **Stable Testnet** (in-process facilitator) and **Stable Mainnet** (external [SemanticPay](https://docs.semanticpay.io) facilitator).
 
 ## About x402
 
-x402 is a payment protocol built on the HTTP 402 (Payment Required) status code. It enables pay-per-request access to web APIs using on-chain token transfers, without requiring accounts, subscriptions, or API keys.
+x402 is a payment protocol built on the HTTP 402 (Payment Required) status code. It enables **pay-per-request** access to web APIs using on-chain USDT0 transfers, without requiring accounts, subscriptions, or API keys.
 
 ### Actors
-
-The protocol has three actors:
 
 | Actor | Role |
 |-------|------|
 | **Client** | Requests a protected resource. On receiving a 402 response, signs an EIP-3009 `TransferWithAuthorization` and retries with the signed payment attached. |
 | **Resource Server** | Serves protected endpoints. Returns 402 with payment requirements when no valid payment is present. Once payment is verified, serves the resource. |
-| **Facilitator** | Verifies payment signatures and settles on-chain. Can run in-process (embedded in the server) or as a standalone service. |
+| **Facilitator** | Verifies payment signatures and settles on-chain. Can run **in-process** (embedded in the server) or as an **external service** (e.g. SemanticPay). The facilitator pays the gas fees for on-chain settlement. |
 
-### Payment Flow
-
-```
-Client                    Server (+ Facilitator)           Blockchain
-  |                              |                             |
-  |  1. GET /weather             |                             |
-  |----------------------------->|                             |
-  |                              |                             |
-  |  2. 402 Payment Required     |                             |
-  |<-----------------------------|                             |
-  |  (price, asset, payTo, net)  |                             |
-  |                              |                             |
-  |  3. Sign EIP-3009 payload    |                             |
-  |  (TransferWithAuthorization) |                             |
-  |                              |                             |
-  |  4. GET /weather + signature |                             |
-  |----------------------------->|                             |
-  |                              |                             |
-  |             5. Verify signature, balance, nonce            |
-  |                              |                             |
-  |  6. 200 OK + weather data    |                             |
-  |<-----------------------------|                             |
-  |                              |                             |
-  |              7. Settle (async): receiveWithAuthorization   |
-  |                              |---------------------------->|
-  |                              |                             |
-  |                              |  8. Transaction confirmed   |
-  |                              |<----------------------------|
-```
-
-The server uses a **verify-first** pattern: it verifies the payment and responds immediately, then settles on-chain asynchronously after the response is sent. This avoids making the client wait for blockchain confirmation.
-
-## About WDK
-
-This project uses [WDK (Wallet Development Kit)](https://docs.wallet.tether.io) for all wallet operations instead of viem or ethers.
-
-### @tetherto/wdk-wallet-evm
-
-Provides BIP-39/BIP-44 wallet management for EVM chains. Used in this project for:
-
-- Deriving wallet accounts from a mnemonic seed phrase
-- Signing EIP-712 typed data (for x402 payment authorization)
-- Querying ERC-20 token balances (USDT0 on Plasma)
-
-```js
-import WalletManagerEvm from "@tetherto/wdk-wallet-evm";
-
-const walletAccount = await new WalletManagerEvm(mnemonic, {
-  provider: "https://rpc.plasma.to",
-}).getAccount();
-
-console.log(walletAccount.address);
-
-const balance = await walletAccount.getTokenBalance("0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb");
-console.log(Number(balance) / 1e6, "USDT0");
-```
-
-For detailed documentation about the WDK ecosystem, visit [docs.wallet.tether.io](https://docs.wallet.tether.io).
-
-### @semanticpay/wdk-wallet-evm-x402-facilitator
-
-Bridges WDK wallets to the x402 facilitator signer interface. Wraps a `WalletAccountEvm` so it can be passed to x402's `registerExactEvmScheme` as a facilitator signer:
-
-```js
-import WalletAccountEvmX402Facilitator from "@semanticpay/wdk-wallet-evm-x402-facilitator";
-
-const evmSigner = new WalletAccountEvmX402Facilitator(walletAccount);
-
-registerFacilitatorScheme(facilitator, {
-  signer: evmSigner,
-  networks: "eip155:9745",
-});
-```
-
-The adapter provides `readContract`, `writeContract`, `verifyTypedData`, `sendTransaction`, and `waitForTransactionReceipt` — everything x402's EVM facilitator needs to verify and settle payments.
-
-## How the Demo Works
-
-### External Facilitator (Default)
-
-The resource server (`x402/server.js`) connects to an external facilitator service via HTTP. The facilitator (`x402/facilitator.js`) runs as a standalone service and pushes lifecycle events back to the resource server for SSE broadcasting:
-
-### In-Process Facilitator
-
-Both the resource server and facilitator run in a single process (`x402/server-inprocess.js`). The facilitator is created with lifecycle hooks that broadcast Server-Sent Events (SSE) to connected clients:
+### Payment Flow (Verify-First Pattern)
 
 ```
-onBeforeVerify  → SSE: verify_started
-onAfterVerify   → SSE: verify_completed
-onBeforeSettle  → SSE: settle_started
-onAfterSettle   → SSE: settle_completed
+Client                    Server                  Facilitator            Blockchain
+  |                         |                         |                      |
+  |  1. GET /weather        |                         |                      |
+  |------------------------>|                         |                      |
+  |                         |                         |                      |
+  |  2. 402 Payment Required|                         |                      |
+  |<------------------------|                         |                      |
+  |  (price, asset, payTo)  |                         |                      |
+  |                         |                         |                      |
+  |  3-4. Sign EIP-3009     |                         |                      |
+  |  (off-chain, no gas)    |                         |                      |
+  |                         |                         |                      |
+  |  5. GET /weather + sig  |                         |                      |
+  |------------------------>|                         |                      |
+  |                         |  6. POST /verify        |                      |
+  |                         |------------------------>|                      |
+  |                         |  7. { isValid: true }   |                      |
+  |                         |<------------------------|                      |
+  |                         |                         |                      |
+  |  8. 200 OK + data       |                         |                      |
+  |<------------------------|                         |                      |
+  |                         |                         |                      |
+  |    (client done)        |  9. POST /settle (async)|                      |
+  |                         |------------------------>|                      |
+  |                         |                         | 10. receiveWithAuth  |
+  |                         |                         |--------------------->|
+  |                         |                         |  tx confirmed        |
+  |                         |                         |<---------------------|
 ```
 
-### Verify-First Middleware
+The server uses a **verify-first** pattern: it verifies the payment signature and responds immediately (Step 8), then settles on-chain asynchronously (Steps 9-10). The client never waits for blockchain confirmation.
 
-The custom middleware in `x402/middleware.js` replaces the standard `paymentMiddleware` from `@x402/express`. It:
-
-1. Calls `httpServer.processHTTPRequest()` to verify the payment
-2. If verified, hooks into `res.on("finish")` to trigger settlement after the response is sent
-3. Calls `next()` to let the route handler send the response immediately
-4. Settlement runs asynchronously via `httpServer.processSettlement()`
+## Architecture
 
 ### HTTP Demo
 
-The React UI at `demo/http/` connects to the server's SSE endpoint and renders each step of the payment flow in real time as it happens — from the initial 402 response through signature creation, verification, response delivery, and on-chain settlement.
+Two execution modes are available:
+
+**Testnet (In-Process Facilitator)**
+```
+Browser (:5173)  <--SSE-->  Server + Facilitator (:4021)  -->  Stable Testnet (2201)
+                            [server-inprocess.js]
+```
+
+**Mainnet (External Facilitator)**
+```
+Browser (:5173)  <--SSE-->  Resource Server (:4021)  --HTTP-->  SemanticPay Facilitator  -->  Stable Mainnet (988)
+                            [server.js]                         [x402.semanticpay.io]
+```
 
 ### MCP Demo
 
-The MCP server at `demo/mcp/server.js` is a stdio-based MCP tool server for Claude Desktop. When Claude calls the `get-weather` tool:
+```
+Claude Desktop  <--stdio-->  MCP Server         --HTTP-->  x402 Server (:4021)  -->  Blockchain
+                              [mcp/server.js]               [server*.js]
 
-1. It makes a paid request to the x402 server using `@x402/fetch`
-2. The payment is signed automatically using the WDK wallet
-3. The tool call is logged to `mcp-calls.json`
-4. The React dashboard at `demo/mcp/` shows the wallet balance and call history
+Dashboard (:4030)  <--reads-->  mcp-calls.json
+[mcp/dashboard.js]
+```
+
+When Claude calls the `get-weather` tool:
+1. MCP Server sends `GET /weather` to the x402 server
+2. Receives 402, automatically signs EIP-3009 payment, retries
+3. Returns weather data to Claude
+4. Logs the call (including txHash) to `mcp-calls.json`
+5. Dashboard displays balance, call history, and explorer links
+
+## Prerequisites
+
+- **Node.js** v20 이상
+- **BIP-39 Mnemonic**: HD 지갑 시드 구문. MetaMask 등에서 확인하거나 새로 생성
+- **USDT0 잔액**: 결제에 사용할 지갑에 USDT0가 있어야 합니다
+  - 테스트넷: [faucet.stable.xyz](https://faucet.stable.xyz)에서 무료 수령
+  - 메인넷: [usdt0.to/transfer](https://usdt0.to/transfer) 브릿지로 USDT0 전환
+- **수신 주소**: 결제를 받을 Ethereum 주소 (PAY_TO_ADDRESS)
+
+### Wallet Index
+
+이 프로젝트는 WDK를 사용하여 BIP-44 경로(`m/44'/60'/0'/0/{index}`)로 지갑을 파생합니다. 테스트넷은 index 0, 메인넷은 index 2를 기본으로 사용합니다. 잔액이 있는 index에 맞춰 `x402/config.js`의 `WALLET_INDEX`를 조정하세요.
+
+```bash
+# 지갑 주소 확인
+NETWORK_MODE=testnet node -e "
+import WalletManagerEvm from '@tetherto/wdk-wallet-evm';
+import { CHAIN_RPC, WALLET_INDEX } from './x402/config.js';
+import { config } from 'dotenv'; config();
+const a = await new WalletManagerEvm(process.env.MNEMONIC, { provider: CHAIN_RPC }).getAccount(WALLET_INDEX);
+console.log('Address:', a.address);
+"
+```
 
 ## Quick Start
 
+### 1. Install
+
 ```bash
 npm install
-npm run setup
+npm install --prefix demo/http
+npm install --prefix demo/mcp
 ```
 
-The setup wizard will:
-- Ask for your environment variables (MNEMONIC, PAY_TO_ADDRESS)
-- Create the `.env` file
-- Start the required servers
-- For MCP: configure Claude Desktop and open the dashboard
-
-## Manual Setup
-
-Copy the environment file and fill in your credentials:
+### 2. Configure
 
 ```bash
 cp .env.example .env
@@ -154,46 +128,26 @@ cp .env.example .env
 
 | Variable | Description |
 |----------|-------------|
-| `MNEMONIC` | BIP-39 mnemonic seed phrase. The derived account must have USDT0 balance on Plasma. |
+| `MNEMONIC` | BIP-39 mnemonic seed phrase. |
 | `PAY_TO_ADDRESS` | Ethereum address (0x...) to receive payments. |
-| `FACILITATOR_URL` | Facilitator service URL. Use `https://x402.semanticpay.io` for the hosted Semantic facilitator or `http://localhost:4022` for self-hosted. |
+| `FACILITATOR_URL` | External facilitator URL. Required for mainnet. Use `https://x402.semanticpay.io`. |
 
-## HTTP Demo
+### 3. Run
 
-Visualizes the full x402 payment flow in the browser with real on-chain transactions.
+| Command | Network | Facilitator | Description |
+|---------|---------|-------------|-------------|
+| `npm run demo:http:testnet` | Stable Testnet (2201) | In-process | HTTP demo with local facilitator |
+| `npm run demo:http:mainnet` | Stable Mainnet (988) | SemanticPay | HTTP demo with external facilitator |
+| `npm run demo:mcp:testnet` | Stable Testnet (2201) | In-process | MCP demo + dashboard |
+| `npm run demo:mcp:mainnet` | Stable Mainnet (988) | SemanticPay | MCP demo + dashboard |
 
-```bash
-npm run demo:http
-```
+**HTTP Demo**: Open http://localhost:5173 and click "Access Weather App" to trigger a real payment flow.
 
-This starts the facilitator on :4022, the x402 server on :4021, and the React UI on :5173. Open http://localhost:5173 and click "Access Weather App" to trigger a real payment. Each request costs 0.0001 USDT0.
+**MCP Demo**: Open http://localhost:4030 for the dashboard. Ask Claude Desktop to "get the weather".
 
-To use the Semantic hosted facilitator instead of running your own, set `FACILITATOR_URL=https://x402.semanticpay.io` in your `.env` and use:
+## MCP Setup (Claude Desktop)
 
-```bash
-npm run demo:http
-```
-
-The server will connect to the Semantic facilitator — no need to run facilitator.js locally.
-
-## MCP Demo
-
-Connects Claude Desktop to an x402-protected weather endpoint via MCP.
-
-### 1. Start the server and dashboard
-
-```bash
-npm run demo:mcp
-```
-
-This builds the React dashboard, then starts the facilitator on :4022, the x402 server on :4021, and the dashboard on :4030.
-
-### 2. Configure Claude Desktop
-
-Add to your Claude Desktop config:
-
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Linux: `~/.config/Claude/claude_desktop_config.json`
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
@@ -203,61 +157,54 @@ Add to your Claude Desktop config:
       "args": ["<absolute-path-to-repo>/demo/mcp/server.js"],
       "env": {
         "MNEMONIC": "<your mnemonic>",
-        "RESOURCE_SERVER_URL": "http://localhost:4021"
+        "RESOURCE_SERVER_URL": "http://localhost:4021",
+        "CHAIN_RPC": "https://rpc.stable.xyz",
+        "WALLET_INDEX": "2"
       }
     }
   }
 }
 ```
 
-If the file already has other `mcpServers` entries, add `x402-weather` alongside them. The setup wizard (`npm run setup`) handles this merge automatically.
+For testnet, change `CHAIN_RPC` to `https://rpc.testnet.stable.xyz` and `WALLET_INDEX` to `"0"`.
 
-### 3. Use it
+Restart Claude Desktop after editing the config.
 
-Restart Claude Desktop and ask it to "get the weather". Each tool call costs 0.0001 USDT0. View call history and balance at http://localhost:4030.
+## Network Configuration
+
+The network is selected via `NETWORK_MODE` environment variable (set automatically by npm scripts).
+
+| | Testnet | Mainnet |
+|---|---|---|
+| Chain ID | 2201 | 988 |
+| Network | `eip155:2201` | `eip155:988` |
+| RPC | `https://rpc.testnet.stable.xyz` | `https://rpc.stable.xyz` |
+| USDT0 | `0x78Cf2437...` | `0x779Ded0c...` |
+| EIP-712 Domain Name | `USD₮0` | `USDT0` |
+| Explorer | [testnet.stablescan.xyz](https://testnet.stablescan.xyz) | [stablescan.xyz](https://stablescan.xyz) |
+| Wallet Index | 0 | 2 |
+| Faucet | [faucet.stable.xyz](https://faucet.stable.xyz) | N/A (real tokens) |
+| Facilitator | In-process only | [x402.semanticpay.io](https://x402.semanticpay.io) |
+| Payment | 0.0001 USDT0 per request | 0.0001 USDT0 per request |
 
 ## Project Structure
 
 ```
 x402/
-  config.js              Shared constants (USDT0 address, RPC URL, network ID, price)
-  middleware.js           Verify-first payment middleware
-  server.js              Resource server using an external facilitator via HTTP (default)
-  server-inprocess.js    Resource server with in-process facilitator and SSE events
-  facilitator.js         Standalone facilitator service with SSE event forwarding
-  client.js              CLI client that makes a paid request
+  config.js              Network config (testnet/mainnet) selected by NETWORK_MODE
+  middleware.js           Verify-first payment middleware with logging
+  server.js              Resource server with external facilitator (mainnet)
+  server-inprocess.js    Resource server with in-process facilitator (testnet)
+  client.js              CLI client for testing paid requests
 
 demo/
-  http/                  Payment flow visualization (React + Vite, port 5173)
-    src/App.jsx          Timeline UI connected to SSE events
+  http/                  Payment flow visualization (React + Vite, :5173)
+    src/App.jsx          Timeline UI with dynamic architecture diagram
   mcp/
     server.js            MCP stdio server (get-weather tool) for Claude Desktop
-    dashboard.js         Express API for wallet balance and call history
-    src/App.jsx          React dashboard (balance card, call history table)
-
-bin/
-  setup.js               Interactive setup wizard
+    dashboard.js         Express API for balance, call history, chain config
+    src/App.jsx          Dashboard UI (balance, call history with explorer links)
 ```
-
-## Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run setup` | Interactive setup wizard (creates .env, starts servers, configures Claude Desktop) |
-| `npm run demo:http` | Start facilitator, x402 server, and HTTP demo UI |
-| `npm run demo:http-inprocess` | Start x402 server (in-process facilitator) and HTTP demo UI |
-| `npm run demo:mcp` | Build dashboard, start facilitator, x402 server, and MCP dashboard |
-| `npm run demo:mcp-inprocess` | Build dashboard, start x402 server (in-process facilitator) and MCP dashboard |
-
-## Network
-
-| | |
-|---|---|
-| Chain | Plasma (chainId 9745) |
-| RPC | https://rpc.plasma.to |
-| USDT0 | `0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb` |
-| Explorer | https://explorer.plasma.to |
-| Payment amount | 0.0001 USDT0 (100 base units) per request |
 
 ## Key Dependencies
 
